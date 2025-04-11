@@ -1,5 +1,6 @@
 import { Router } from "express";
 import connectionPool from "../utils/db.mjs";
+import { validateQuestionBody, validateAnswerBody, validateSearchParam, validateVote } from "../middleware/validateQuestion.mjs";
 
 const questionRouter = Router();
 
@@ -92,7 +93,7 @@ questionRouter.get("/:questionId", async (req, res) => {
 });
 
 // create a new question
-questionRouter.post("/", async (req, res) => {
+questionRouter.post("/", [validateQuestionBody] ,async (req, res) => {
     try {
         const newQuestion = {
             ...req.body,
