@@ -4,6 +4,32 @@ import { validateVote } from "../middleware/validateQuestion.mjs";
 
 const answerRouter = Router();
 
+/**
+ * @swagger
+ * /answers/{answerId}/vote:
+ *   post:
+ *     summary: Vote on an answer
+ *     parameters:
+ *       - in: path
+ *         name: answerId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               vote:
+ *                 type: integer
+ *     responses:
+ *       201:
+ *         description: Vote recorded
+ *       404:
+ *         description: Answer not found
+ */
 answerRouter.post("/:answerId/vote", [validateVote] ,async (req, res) => {
     try {
         const answerId = req.params.answerId
