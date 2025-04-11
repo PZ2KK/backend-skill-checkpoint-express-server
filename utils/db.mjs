@@ -1,10 +1,9 @@
-// Create PostgreSQL Connection Pool here !
 import * as pg from "pg";
 const { Pool } = pg.default;
 
 const connectionPool = new Pool({
   connectionString:
-    "postgresql://your-db-username:your-db-password@localhost:5432/your-db-name",
+    "postgresql://postgres:159753@localhost:5432/Quora_Mock_PostgreSQL",
 });
 
 export default connectionPool;

@@ -1,0 +1,539 @@
+import { Router } from "express";
+import connectionPool from "../utils/db.mjs";
+import { validateQuestionBody, validateAnswerBody, validateSearchParam, validateVote } from "../middleware/validateQuestion.mjs";
+
+const questionRouter = Router();
+
+/**
+ * @swagger
+ * /questions:
+ *   get:
+ *     summary: Get all questions
+ *     responses:
+ *       200:
+ *         description: List of all questions
+ */
+questionRouter.get("/", async (req, res) => {
+    try {
+        const results = await connectionPool.query(`SELECT * FROM questions`);
+        return res.status(200).json({
+            data: results.rows,
+          });
+
+    } catch(err) {
+        console.error(err);
+        return res.status(500).json({
+            message: "Unable to fetch questions.",
+        });
+    };
+});
+
+/**
+ * @swagger
+ * /questions/search:
+ *   get:
+ *     summary: Search questions by title or category
+ *     parameters:
+ *       - in: query
+ *         name: title
+ *         schema:
+ *           type: string
+ *       - in: query
+ *         name: category
+ *         schema:
+ *           type: string
+ *     responses:
+ *       200:
+ *         description: Search results
+ */
+questionRouter.get("/search", async (req, res) => {
+    try {
+        const { title, category } = req.query;
+
+        let query = "SELECT * FROM questions";
+        let values = [];
+        let whereClauses = [];
+
+        if (title) {
+            whereClauses.push(`title ILIKE $${values.length + 1}`);
+            values.push(`%${title}%`);
+        }
+        
+        if (category) {
+            whereClauses.push(`category ILIKE $${values.length + 1}`);
+            values.push(`%${category}%`);
+        }   
+
+        if (whereClauses.length > 0) {
+            query += " WHERE " + whereClauses.join(" AND ");
+        }
+
+        const results = await connectionPool.query(query, values);
+
+        if (results.rows.length === 0) {
+            return res.status(400).json({
+                message: `Invalid search parameters.`,
+        });
+        }
+
+        return res.status(200).json({
+        data: results.rows,
+        });
+          
+    } catch(err) {
+        console.error(err);
+        return res.status(500).json({
+            message: "Unable to fetch questions.",
+        });
+    };
+});
+
+
+/**
+ * @swagger
+ * /questions/{questionId}:
+ *   get:
+ *     summary: Get a question by ID
+ *     parameters:
+ *       - in: path
+ *         name: questionId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: A question object
+ *       404:
+ *         description: Question not found
+ */
+questionRouter.get("/:questionId", async (req, res) => {
+    try {
+        const questionId = req.params.questionId
+        const results = await connectionPool.query(
+            `
+            SELECT * FROM questions WHERE id = $1
+            `, [questionId]);
+
+        if (results.rows.length === 0) {
+            return res.status(404).json({
+                message: `Question not found.`,
+        });
+        }
+
+        return res.status(200).json({
+            data: results.rows[0],
+        });
+
+    } catch(err) {
+        console.error(err);
+        return res.status(500).json({
+            message: "Unable to fetch questions.",
+        });
+    };
+});
+
+/**
+ * @swagger
+ * /questions:
+ *   post:
+ *     summary: Create a new question
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               category:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Question created
+ */
+questionRouter.post("/", [validateQuestionBody] ,async (req, res) => {
+    try {
+        const newQuestion = {
+            ...req.body,
+        };
+
+        await connectionPool.query(
+            `
+              INSERT INTO questions 
+              (title, description, category)
+              VALUES ($1, $2, $3)
+            `,
+            [
+              newQuestion.title,
+              newQuestion.description,
+              newQuestion.category,
+            ]
+          );
+
+        return res.status(201).json({
+            message: "Question created successfully.",
+        });
+
+    } catch(err) {
+        console.error(err);
+        return res.status(500).json({
+            message: "Unable to create question.",
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /questions/{questionId}:
+ *   put:
+ *     summary: Update a question by ID
+ *     parameters:
+ *       - in: path
+ *         name: questionId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               title:
+ *                 type: string
+ *               description:
+ *                 type: string
+ *               category:
+ *                 type: string
+ *     responses:
+ *       200:
+ *         description: Question updated
+ *       404:
+ *         description: Question not found
+ */
+questionRouter.put("/:questionId", async (req, res) => {
+    try {
+        const questionId = req.params.questionId
+
+        const questionCheck = await connectionPool.query(
+            `SELECT id FROM questions WHERE id = $1`,
+            [questionId]
+          );
+          if (questionCheck.rows.length === 0) {
+            return res.status(404).json({
+              message: `Question not found.`,
+            });
+          }
+        
+        const updateQuestion = {
+            ...req.body,
+        };
+
+        await connectionPool.query(
+            `
+              UPDATE questions 
+              SET   title = $2,
+                    description = $3,
+                    category = $4
+              WHERE id = $1
+            `,
+            [
+              questionId,
+              updateQuestion.title,
+              updateQuestion.description,
+              updateQuestion.category,
+            ]
+          );
+
+        return res.status(200).json({
+            message: "Update question successfully.",
+        });
+
+    } catch (err) {
+        console.error(err);
+        return res.status(500).json({
+            message: "Unable to update question.",
+        });
+    }    
+});
+
+/**
+ * @swagger
+ * /questions/{questionId}:
+ *   delete:
+ *     summary: Delete a question and its answers
+ *     parameters:
+ *       - in: path
+ *         name: questionId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: Question and answers deleted
+ *       404:
+ *         description: Question not found
+ */
+questionRouter.delete("/:questionId", async (req, res) => {
+    try {
+        const questionId = req.params.questionId
+
+        const questionCheck = await connectionPool.query(
+            `SELECT id FROM questions WHERE id = $1`,
+            [questionId]
+          );
+          if (questionCheck.rows.length === 0) {
+            return res.status(404).json({
+              message: `Question not found.`,
+            });
+          }
+
+        await connectionPool.query(
+            `DELETE FROM questions WHERE id = $1`,
+            [questionId]
+        );
+        await connectionPool.query(
+            `DELETE FROM answers WHERE question_id = $1`,
+            [questionId]
+        );
+      
+          return res.status(200).json({
+            message: "Deleted question and answer successfully",
+          });
+
+    } catch(err) {
+        console.error(err);
+        return res.status(500).json({
+            message: "Unable to delete questions.",
+        });
+    };
+});
+
+/**
+ * @swagger
+ * /questions/{questionId}/vote:
+ *   post:
+ *     summary: Vote on a question
+ *     parameters:
+ *       - in: path
+ *         name: questionId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               vote:
+ *                 type: integer
+ *     responses:
+ *       201:
+ *         description: Vote recorded
+ *       404:
+ *         description: Question not found
+ */
+questionRouter.post("/:questionId/vote", async (req, res) => {
+    try {
+        const questionId = req.params.questionId
+        const newVote = {
+            ...req.body,
+        };
+
+        const results = await connectionPool.query(
+            `
+            SELECT id FROM questions WHERE id = $1
+            `, [questionId]);
+
+        if (results.rows.length === 0) {
+            return res.status(404).json({
+                message: `Questions not found.`,
+        });
+        }
+
+        await connectionPool.query(
+            `
+              INSERT INTO question_votes
+              (question_id, vote)
+              VALUES ($1, $2)
+            `,
+            [
+              questionId,
+              newVote.vote,
+            ]
+          );
+
+        return res.status(201).json({
+            message: "Vote on the question has been recorded successfully.",
+        });
+
+    } catch(err) {
+        console.error(err);
+        return res.status(500).json({
+            message: "Unable to vote question.",
+        });
+    }
+});
+
+//------------------------------Answer------------------------------
+
+/**
+ * @swagger
+ * /questions/{questionId}/answers:
+ *   get:
+ *     summary: Get all answers for a question
+ *     parameters:
+ *       - in: path
+ *         name: questionId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: List of answers
+ *       404:
+ *         description: Answers not found
+ */
+questionRouter.get("/:questionId/answers", async (req, res) => {
+    try {
+        const questionId = req.params.questionId
+        const results = await connectionPool.query(
+            `
+            SELECT * FROM answers WHERE question_id = $1
+            `, [questionId]);
+
+        if (results.rows.length === 0) {
+            return res.status(404).json({
+                message: `Answers not found.`,
+        });
+        }
+
+        return res.status(200).json({
+            data: results.rows,
+        });
+
+    } catch(err) {
+        console.error(err);
+        return res.status(500).json({
+            message: "Unable to fetch answers.",
+        });
+    };
+});
+
+/**
+ * @swagger
+ * /questions/{questionId}/answers:
+ *   post:
+ *     summary: Create a new answer for a question
+ *     parameters:
+ *       - in: path
+ *         name: questionId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     requestBody:
+ *       required: true
+ *       content:
+ *         application/json:
+ *           schema:
+ *             type: object
+ *             properties:
+ *               content:
+ *                 type: string
+ *     responses:
+ *       201:
+ *         description: Answer created
+ */
+questionRouter.post("/:questionId/answers", async (req,  res) => {
+    try {
+        const questionId = req.params.questionId
+        const newAnswer = {
+            ...req.body,
+        };
+
+        await connectionPool.query(
+            `
+              INSERT INTO answers 
+              (question_id, content)
+              VALUES ($1, $2)
+            `,
+            [questionId, newAnswer.content]
+          );
+
+        return res.status(201).json({
+            message: "Answer created successfully.",
+        });
+
+    } catch(err) {
+        console.error(err);
+        return res.status(500).json({
+            message: "Unable to create answers.",
+        });
+    }
+});
+
+/**
+ * @swagger
+ * /questions/{questionId}/answers:
+ *   delete:
+ *     summary: Delete all answers for a question
+ *     parameters:
+ *       - in: path
+ *         name: questionId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: All answers deleted
+ *       404:
+ *         description: Question or answers not found
+ */
+questionRouter.delete("/:questionId/answers", async (req, res) => {
+    try {
+        const questionId = req.params.questionId
+
+        const questionCheck = await connectionPool.query(
+            `SELECT id FROM questions WHERE id = $1`,
+            [questionId]
+          );    
+        const answerCheck = await connectionPool.query(
+            `SELECT * FROM answers WHERE question_id = $1`,
+            [questionId]
+          );    
+
+        if (questionCheck.rows.length === 0) {
+            return res.status(404).json({
+              message: `Question not found.`,
+            });
+        }
+        if (answerCheck.rows.length === 0) {
+            return res.status(404).json({
+              message: `There is no answer exist.`,
+            });
+        }
+
+        await connectionPool.query(
+            `DELETE FROM answers WHERE question_id = $1`,
+            [questionId]
+          );
+      
+          return res.status(200).json({
+            message: "All answers for the question have been deleted successfully.",
+          });
+
+    } catch(err) {
+        console.error(err);
+        return res.status(500).json({
+            message: "Unable to delete answers.",
+        });
+    };
+});
+
+export default questionRouter;
