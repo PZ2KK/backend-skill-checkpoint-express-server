@@ -1,6 +1,6 @@
 import { Router } from "express";
 import connectionPool from "../utils/db.mjs";
-
+import { validateAnswerBody } from "../middleware/validateQuestion.mjs";
 
 const answerRouter = Router({ mergeParams: true });
 
@@ -71,7 +71,7 @@ answerRouter.get("/", async (req, res) => {
  *       201:
  *         description: Answer created
  */
-answerRouter.post("/", async (req,  res) => {
+answerRouter.post("/", [validateAnswerBody], async (req,  res) => {
     try {
         const questionId = req.params.questionId
         const newAnswer = {

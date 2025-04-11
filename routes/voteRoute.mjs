@@ -98,7 +98,7 @@ voteRouter.post("/answer/:answerId/vote", [validateVote] ,async (req, res) => {
  *       404:
  *         description: Question not found
  */
-voteRouter.post("/question/:questionId/vote", async (req, res) => {
+voteRouter.post("/question/:questionId/vote", [validateVote] ,async (req, res) => {
     try {
         const questionId = req.params.questionId
         const newVote = {

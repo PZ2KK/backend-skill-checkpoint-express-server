@@ -1,6 +1,6 @@
 import { Router } from "express";
 import connectionPool from "../utils/db.mjs";
-import { validateQuestionBody, validateAnswerBody, validateSearchParam} from "../middleware/validateQuestion.mjs";
+import { validateQuestionBody, validateSearchParam} from "../middleware/validateQuestion.mjs";
 
 const questionRouter = Router();
 
@@ -46,7 +46,7 @@ questionRouter.get("/", async (req, res) => {
  *       200:
  *         description: Search results
  */
-questionRouter.get("/search", async (req, res) => {
+questionRouter.get("/search", [validateSearchParam],  async (req, res) => {
     try {
         const { title, category } = req.query;
 
@@ -106,7 +106,7 @@ questionRouter.get("/search", async (req, res) => {
  *       404:
  *         description: Question not found
  */
-questionRouter.get("/:questionId", async (req, res) => {
+questionRouter.get("/:questionId",  async (req, res) => {
     try {
         const questionId = req.params.questionId
         const results = await connectionPool.query(
@@ -215,7 +215,7 @@ questionRouter.post("/", [validateQuestionBody] ,async (req, res) => {
  *       404:
  *         description: Question not found
  */
-questionRouter.put("/:questionId", async (req, res) => {
+questionRouter.put("/:questionId", [validateQuestionBody], async (req, res) => {
     try {
         const questionId = req.params.questionId
 
