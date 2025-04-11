@@ -1,6 +1,7 @@
 {
   "name": "express-server-template",
   "version": "1.0.0",
+  "type": "module",
   "description": "",
   "main": "app.mjs",
   "scripts": {
@@ -12,6 +13,9 @@
   "license": "ISC",
   "dependencies": {
     "express": "^4.19.2",
-    "nodemon": "^3.1.4"
+    "nodemon": "^3.1.4",
+    "pg": "^8.14.1",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.1"
   }
 }
