@@ -235,10 +235,14 @@ questionRouter.delete("/:questionId", async (req, res) => {
         await connectionPool.query(
             `DELETE FROM questions WHERE id = $1`,
             [questionId]
-          );
+        );
+        await connectionPool.query(
+            `DELETE FROM answers WHERE question_id = $1`,
+            [questionId]
+        );
       
           return res.status(200).json({
-            message: "Deleted question successfully",
+            message: "Deleted question and answer successfully",
           });
 
     } catch(err) {
