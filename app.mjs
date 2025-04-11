@@ -1,6 +1,7 @@
 import express from "express";
 import questionRouter from "./routes/questionRoute.mjs";
 import answerRouter from "./routes/answerRoute.mjs";
+import voteRouter from "./routes/voteRoute.mjs";
 import swaggerDocs from './config/swagger.js';
 
 
@@ -14,7 +15,8 @@ app.get("/test", (req, res) => {
 });
 
 app.use("/questions", questionRouter)
-app.use("/answers", answerRouter)
+app.use("/questions/:questionId/answers", answerRouter)
+app.use("/", voteRouter)
 
 swaggerDocs(app);
 

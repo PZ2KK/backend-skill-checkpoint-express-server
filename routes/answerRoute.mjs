@@ -1,17 +1,60 @@
 import { Router } from "express";
 import connectionPool from "../utils/db.mjs";
-import { validateVote } from "../middleware/validateQuestion.mjs";
 
-const answerRouter = Router();
+
+const answerRouter = Router({ mergeParams: true });
 
 /**
  * @swagger
- * /answers/{answerId}/vote:
- *   post:
- *     summary: Vote on an answer
+ * /questions/{questionId}/answers:
+ *   get:
+ *     summary: Get all answers for a question
  *     parameters:
  *       - in: path
- *         name: answerId
+ *         name: questionId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: List of answers
+ *       404:
+ *         description: Answers not found
+ */
+answerRouter.get("/", async (req, res) => {
+    try {
+        const questionId = req.params.questionId
+        const results = await connectionPool.query(
+            `
+            SELECT * FROM answers WHERE question_id = $1
+            `, [questionId]);
+
+        if (results.rows.length === 0) {
+            return res.status(404).json({
+                message: `Answers not found.`,
+        });
+        }
+
+        return res.status(200).json({
+            data: results.rows,
+        });
+
+    } catch(err) {
+        console.error(err);
+        return res.status(500).json({
+            message: "Unable to fetch answers.",
+        });
+    };
+});
+
+/**
+ * @swagger
+ * /questions/{questionId}/answers:
+ *   post:
+ *     summary: Create a new answer for a question
+ *     parameters:
+ *       - in: path
+ *         name: questionId
  *         required: true
  *         schema:
  *           type: integer
@@ -22,54 +65,96 @@ const answerRouter = Router();
  *           schema:
  *             type: object
  *             properties:
- *               vote:
- *                 type: integer
+ *               content:
+ *                 type: string
  *     responses:
  *       201:
- *         description: Vote recorded
- *       404:
- *         description: Answer not found
+ *         description: Answer created
  */
-answerRouter.post("/:answerId/vote", [validateVote] ,async (req, res) => {
+answerRouter.post("/", async (req,  res) => {
     try {
-        const answerId = req.params.answerId
-        const newVote = {
+        const questionId = req.params.questionId
+        const newAnswer = {
             ...req.body,
         };
 
-        const results = await connectionPool.query(
-            `
-            SELECT id FROM answers WHERE id = $1
-            `, [answerId]);
-
-        if (results.rows.length === 0) {
-            return res.status(404).json({
-                message: `Answers not found.`,
-        });
-        }
-
         await connectionPool.query(
             `
-              INSERT INTO answer_votes
-              (answer_id, vote)
+              INSERT INTO answers 
+              (question_id, content)
               VALUES ($1, $2)
             `,
-            [
-              answerId,
-              newVote.vote,
-            ]
+            [questionId, newAnswer.content]
           );
 
         return res.status(201).json({
-            message: "Vote on the answer has been recorded successfully.",
+            message: "Answer created successfully.",
         });
 
     } catch(err) {
         console.error(err);
         return res.status(500).json({
-            message: "Unable to vote question.",
+            message: "Unable to create answers.",
         });
     }
+});
+
+/**
+ * @swagger
+ * /questions/{questionId}/answers:
+ *   delete:
+ *     summary: Delete all answers for a question
+ *     parameters:
+ *       - in: path
+ *         name: questionId
+ *         required: true
+ *         schema:
+ *           type: integer
+ *     responses:
+ *       200:
+ *         description: All answers deleted
+ *       404:
+ *         description: Question or answers not found
+ */
+answerRouter.delete("/", async (req, res) => {
+    try {
+        const questionId = req.params.questionId
+
+        const questionCheck = await connectionPool.query(
+            `SELECT id FROM questions WHERE id = $1`,
+            [questionId]
+          );    
+        const answerCheck = await connectionPool.query(
+            `SELECT * FROM answers WHERE question_id = $1`,
+            [questionId]
+          );    
+
+        if (questionCheck.rows.length === 0) {
+            return res.status(404).json({
+              message: `Question not found.`,
+            });
+        }
+        if (answerCheck.rows.length === 0) {
+            return res.status(404).json({
+              message: `There is no answer exist.`,
+            });
+        }
+
+        await connectionPool.query(
+            `DELETE FROM answers WHERE question_id = $1`,
+            [questionId]
+          );
+      
+          return res.status(200).json({
+            message: "All answers for the question have been deleted successfully.",
+          });
+
+    } catch(err) {
+        console.error(err);
+        return res.status(500).json({
+            message: "Unable to delete answers.",
+        });
+    };
 });
 
 export default answerRouter;
